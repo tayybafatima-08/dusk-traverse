@@ -1,0 +1,5 @@
+# the 2 MB NASA source file is only needed to rebuild data/mola.json
+data/megt90n000cb.img
+node_modules/
+.DS_Store
+.vercel
