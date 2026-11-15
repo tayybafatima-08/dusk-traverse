@@ -2,6 +2,8 @@
 
 NASA Space Apps 2026 entry for **Interplanetary Survival Guide: Martian Map**. You plan a crewed traverse across the Isidis and Jezero region of Mars, balancing time, distance and risk on a map built from NASA data.
 
+[Launch the deployed app](https://dusk-traverse.vercel.app/)
+
 ## What is in the folder
 
 - `index.html` is the **project website**. Its **Launch platform** button opens the app.
