@@ -265,6 +265,8 @@ footer a{color:var(--mute)}
   <div class="ctas">
     <a class="btn go" data-link="app" href="app.html">Launch the app</a>
     <a class="btn ghost" data-link="repo" href="#">View the code on GitHub</a>
+    <a class="btn ghost" data-link="presentation" href="#">Project presentation</a>
+    <a class="btn ghost" data-link="demo" href="#">Video demo</a>
   </div>
   <dl class="team">
     <div><dt>Team</dt><dd>FATIEON</dd></div>
@@ -281,12 +283,14 @@ footer a{color:var(--mute)}
 <script>
 const LINKS = {
   app:  "app.html",   // the app page next to this page
-  repo: "https://github.com/tayybafatima-08/dusk-traverse" 
+  repo: "https://github.com/tayybafatima-08/dusk-traverse",
+  presentation: "https://docs.google.com/presentation/d/1UKcj9fWc6sx5VmiN1-W8fSzKkDCkLfeu/edit?usp=sharing&ouid=118400428403193406357&rtpof=true&sd=true",  
+  demo: "https://drive.google.com/file/d/1lqJLXeWHc2iTK9qgtYB6Owfxvf3_PW7J/view?usp=drive_link"
 };
 document.querySelectorAll("[data-link]").forEach(a=>{
   const url=LINKS[a.dataset.link];
   if(url){a.href=url;if(a.dataset.link!=="app"){a.target="_blank";a.rel="noopener"}}
-  else if(a.dataset.link==="repo")a.hidden=true;
+  else a.hidden=true;
 });
 
 /* nav background after the hero */
