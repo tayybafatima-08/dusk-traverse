@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dusk Traverse – launch platform</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+:root{--night:#0e1a2b;--ink:#e9eff6;--mute:#9db0c4;--glacier:#7fd6ff;--dust:#f0b66b;--ok:#7be0a4;--bad:#ff7b8a;--line:rgba(127,214,255,.22)}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:#2a120a;color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+#map{position:absolute;inset:0;background:#2a120a}
+h1,h2{font-family:Georgia,"Iowan Old Style",serif;font-weight:400;margin:0}
+h1{font-size:30px;line-height:1.1;letter-spacing:-.01em}
+h2{font-size:19px;margin-bottom:4px}
+#panel{position:absolute;z-index:1000;top:16px;left:16px;bottom:16px;width:392px;display:flex;flex-direction:column;gap:14px;padding:22px;overflow:auto;
+ background:linear-gradient(180deg,rgba(14,26,43,.94),rgba(10,18,32,.92));backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#story{font-family:Georgia,serif;font-size:16.5px;line-height:1.65;color:#dbe6f1;max-width:62ch}
+.sub{color:var(--mute);font-size:13px;margin:6px 0 0}
+section{border-top:1px solid var(--line);padding-top:12px}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:9px 14px;transition:background .15s,border-color .15s}
+button:hover{background:rgba(127,214,255,.1);border-color:var(--glacier)}
+button.go{background:var(--glacier);color:#06121f;border-color:var(--glacier);font-weight:600}
+button.go:hover{background:#a6e5ff}
+button:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible,.leaflet-container a:focus-visible{outline:2px solid var(--dust);outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+ol{margin:6px 0 0;padding-left:20px}
+li{margin:3px 0}
+li small{color:var(--mute)}
+#stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:rgba(127,214,255,.06);border-radius:12px;padding:10px}
+.stat b{display:block;font:400 24px Georgia,serif}
+.stat span{font-size:12px;color:var(--mute)}
+.bar{height:6px;border-radius:3px;background:rgba(255,255,255,.1);margin-top:6px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--ok);transition:width .4s,background .4s}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
+#log{font-size:13.5px;color:var(--mute);max-height:150px;overflow:auto}
+#log p{margin:0 0 7px}#log p b{color:var(--dust);font-weight:600}
+.beacon{width:22px;height:22px;border-radius:50%;background:var(--dust);border:3px solid #2a120a;box-shadow:0 0 0 0 rgba(240,182,107,.7);animation:pulse 2.4s infinite}
+.beacon.in{background:var(--glacier);box-shadow:0 0 0 4px rgba(127,214,255,.35);animation:none}
+.rover{font-size:22px;filter:drop-shadow(0 0 6px #7fd6ff)}
+@keyframes pulse{70%{box-shadow:0 0 0 14px rgba(240,182,107,0)}100%{box-shadow:0 0 0 0 rgba(240,182,107,0)}}
+@media(prefers-reduced-motion:reduce){.beacon{animation:none}}
+.leaflet-container{font:inherit}
+.leaflet-control-layers,.leaflet-bar a{background:var(--night);color:var(--ink);border-color:var(--line)}
+@media(max-width:800px){#panel{top:auto;left:8px;right:8px;bottom:8px;width:auto;height:52vh;padding:16px}h1{font-size:25px}}
+#sky,#dust,#grade{position:absolute;inset:0;pointer-events:none;z-index:700}
+#sky{background:radial-gradient(ellipse at 50% 45%,transparent 45%,rgba(10,6,20,.62) 100%),linear-gradient(180deg,rgba(60,110,190,.35),transparent 38%)}
+#grade{mix-blend-mode:soft-light;background:rgba(255,170,90,.28)}
+#sky::after{content:"";position:absolute;inset:0;opacity:.13;mix-blend-mode:overlay;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+.tag{background:rgba(14,26,43,.85);color:var(--ink);border:1px solid var(--line);border-radius:8px;box-shadow:none;font-size:12px;padding:2px 8px}
+.tag::before{display:none}
+.beacon{background:radial-gradient(circle at 35% 30%,#fff3d0,#f0b66b 45%,#a85a18)}
+.rover svg{width:38px;height:38px;filter:drop-shadow(0 0 8px #7fd6ff)}
+#v3{position:fixed;inset:0;z-index:1200}#v3[hidden]{display:none}
+#sky3{position:absolute;inset:0;background:linear-gradient(180deg,#1b2f58 0%,#4a5f95 28%,#d9906a 56%,#c98a63 100%)}
+#c3{position:absolute;inset:0;width:100%;height:100%}
+#bar3{position:absolute;top:16px;left:16px;display:flex;gap:8px;flex-wrap:wrap;z-index:2}
+#bar3 button{background:rgba(14,26,43,.85);backdrop-filter:blur(8px)}
+#bar3 #VRButton{position:static!important;width:auto!important;padding:9px 14px!important;border-radius:10px!important;font:inherit!important;background:rgba(14,26,43,.85)!important}
+#cap3{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);width:min(680px,92vw);margin:0;padding:14px 18px;border-radius:14px;background:linear-gradient(180deg,rgba(14,26,43,.92),rgba(10,18,32,.9));border:1px solid var(--line);font:16px/1.55 Georgia,serif}
+#cap3 small{display:block;color:var(--mute);font:12px system-ui;margin-top:4px}
+#pft{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}#pft td,#pft th{padding:3px 4px;text-align:left}#pft th{color:var(--mute);font-weight:400}
+#dock{position:absolute;z-index:1000;left:424px;right:76px;bottom:16px;padding:12px 16px;border-radius:16px;background:linear-gradient(180deg,rgba(14,26,43,.94),rgba(10,18,32,.92));backdrop-filter:blur(8px);border:1px solid var(--line);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#dock[hidden]{display:none}
+#dkh{display:flex;gap:12px;align-items:center;font:16px Georgia,serif}#dkh span{color:var(--mute);font:12px system-ui;flex:1}#dkh button{padding:2px 10px}
+#dkg{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-top:6px}#dkg canvas{width:100%;height:130px;display:block}
+#dkc{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}#dkc span{background:rgba(127,214,255,.08);border-radius:999px;padding:3px 10px;font-size:12px;color:var(--mute)}#dkc b{color:var(--ink);font-weight:600}
+@media(max-width:800px){#dock{left:8px;right:8px;bottom:auto;top:8px}#dkg{grid-template-columns:1fr}#dkg canvas:nth-child(2){display:none}#dkc,#dkn{display:none}#dkg canvas{height:78px}#dock{padding:8px 12px}}
+.lowzoom .tag{display:none}
+#tabs{display:flex;gap:6px;background:rgba(127,214,255,.07);padding:4px;border-radius:12px}#tabs button{flex:1;border:0;padding:9px 10px}#tabs .on{background:var(--glacier);color:#06121f;font-weight:600}
+</style>
+</head>
+<body>
+<div id="map" role="application" aria-label="Interactive map of Mars"></div>
+<div id="grade"></div><div id="sky"></div><canvas id="dust"></canvas>
+<div id="v3" hidden><div id="sky3"></div><canvas id="c3"></canvas><div id="bar3"><button id="x3">Close 3D</button><button id="m3">Chase view</button><button id="r3">Replay</button></div><p id="cap3"></p></div>
+<aside id="panel" aria-live="polite">
+  <header>
+    <h1>Dusk Traverse</h1>
+    <p class="sub">A route-planning mission across Mars, from the Isidis basin to every great plain</p>
+  </header>
+  <a class="sub" href="index.html" style="text-decoration:none">Project home</a>
+  <nav id="tabs"><button id="tabT" class="on">Story traverse</button><button id="tabP">Path finder</button></nav>
+  <p id="story"></p>
+  <section id="card"></section>
+  <section data-m="pf" hidden><h2>Path finder</h2><p class="sub" id="src"></p><p class="sub">Slope analysis now covers all of Mars on a 0.5 degree grid (cells about 30 km wide). Routes cannot cross the 180 degree line.</p><button class="go" id="pf">Find the safest path</button> <button id="padd">Add a place</button> <button id="pall">Whole Mars</button><table id="pft"></table>
+  <div class="row" id="pfa" hidden style="margin-top:10px"><button id="pdrive">Drive this route</button><button id="p3d">View in 3D</button><button id="pexp">Download route</button><button id="pnew">New path</button></div>
+  <label class="sub" style="display:block;margin-top:10px">Dust storm what-if (slows driving, raises risk)<input type="range" id="storm" min="0" max="100" value="0" style="width:100%"></label></section>
+  <section data-m="trv">
+    <h2>Your traverse</h2>
+    <ol id="route"></ol>
+    <div id="stats">
+      <div class="stat"><b id="sSols">0</b><span>sols used of 80</span><div class="bar"><i id="bSols"></i></div></div>
+      <div class="stat"><b id="sKm">0</b><span>kilometres</span></div>
+      <div class="stat"><b id="sRisk">0%</b><span>risk, limit 35%</span><div class="bar"><i id="bRisk"></i></div></div>
+    </div>
+    <p id="verdict" class="sub"></p>
+    <div class="row" style="margin-top:10px">
+      <button id="sample">Try a sample route</button>
+      <button class="go" id="launch">Launch traverse</button>
+      <button id="undo">Undo last stop</button>
+      <button id="reset">Start over</button>
+      <button id="b3">View in 3D</button>
+    </div>
+  </section>
+  <section data-m="trv"><h2>Mission log</h2><div id="log"></div></section>
+</aside>
+<div id="dock" hidden><div id="dkh"><b>Route analytics</b><span id="dkn"></span><button id="dkx" aria-label="Close analytics">×</button></div><div id="dkg"><canvas id="cp"></canvas><canvas id="cb"></canvas></div><div id="dkc"></div></div>
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/three.min.js"></script><script src="vendor/OrbitControls.js"></script><script src="vendor/VRButton.js"></script>
+<script>
+"use strict";
+/* ---- Mission data. Hazard (1 smooth to 5 severe) is a planner's estimate for gameplay, not a NASA figure. ---- */
+const SITES=[
+ {id:"jez",n:"Jezero Delta",ll:[18.44,77.45],h:2,t:"Landing site",s:"An ancient river delta, where Perseverance has been sampling rocks since 2021. Your crew touches down here, beside layers laid down by flowing water."},
+ {id:"nili",n:"Nili Fossae",ll:[21.0,74.5],h:3,t:"Clays and carbonates",s:"Long fractures expose clays and carbonates, minerals that form where water was present. The walls are steep, so the crew drives slowly."},
+ {id:"nilip",n:"Nili Patera",ll:[8.8,67.3],h:4,t:"Volcanic caldera",s:"A collapsed volcanic caldera with silica deposits that hint at hot water long ago. The rim is loose and unstable, so the rover crawls."},
+ {id:"syr",n:"Syrtis Major",ll:[8.4,69.5],h:2,t:"Basalt plain",s:"A broad, dark volcanic shield swept clean by wind. Easy driving and plenty of basalt for future construction."},
+ {id:"isi",n:"Isidis Planitia",ll:[12.9,87.0],h:1,t:"Basin floor",s:"A vast, flat impact basin. Smooth ground and wide horizons make it the best natural runway in the region."},
+ {id:"lib",n:"Libya Montes",ll:[3.0,83.5],h:4,t:"Mountain rim",s:"The rugged rim of the Isidis basin, cut by valleys that water carved billions of years ago. Beautiful and punishing."},
+ {id:"oly",n:"Olympus Mons",ll:[18.65,-133.8],h:5,t:"Giant volcano",s:"The tallest volcano known in the solar system, ringed by a steep cliff. Spectacular, and a hard climb for any rover."},
+ {id:"vall",n:"Valles Marineris",ll:[-13.9,-59.2],h:5,t:"Canyon system",s:"A canyon system thousands of kilometres long. Its layered walls record Mars's history, and its slopes are severe."},
+ {id:"hel",n:"Hellas Planitia",ll:[-42.4,70.5],h:3,t:"Deep basin",s:"One of the largest impact basins on Mars. Its floor sits very low, where the air is thicker and warmer."},
+ {id:"arg",n:"Argyre Planitia",ll:[-49.7,-43.3],h:3,t:"Impact basin",s:"A large impact basin in the cold southern highlands."},
+ {id:"uto",n:"Utopia Planitia",ll:[46.7,117.5],h:2,t:"Northern plain",s:"A vast northern plain where radar studies suggest buried ice, a possible water source for crews."},
+ {id:"ely",n:"Elysium Planitia",ll:[4.5,135.6],h:1,t:"Smooth plain",s:"A flat equatorial plain where NASA's InSight lander listened for marsquakes."},
+ {id:"gal",n:"Gale Crater",ll:[-5.4,137.8],h:3,t:"Crater with a mountain",s:"Home to the Curiosity rover and the layered peak of Mount Sharp, a record of changing ancient climates."},
+ {id:"gus",n:"Gusev Crater",ll:[-14.6,175.4],h:2,t:"Crater plain",s:"Where the Spirit rover explored volcanic plains and found signs of past water."},
+ {id:"mer",n:"Meridiani Planum",ll:[-1.95,-5.5],h:1,t:"Flat plain",s:"A very flat plain where the Opportunity rover drove for years."},
+ {id:"chr",n:"Chryse Planitia",ll:[22.5,-48.0],h:2,t:"Lowland plain",s:"A lowland plain at the end of giant outflow channels, and the landing site of Viking 1."},
+ {id:"aci",n:"Acidalia Planitia",ll:[46.7,-22.0],h:2,t:"Northern lowland",s:"A broad, dark northern lowland plain, a candidate for easy driving."},
+ {id:"arc",n:"Arcadia Planitia",ll:[47.0,-168.0],h:2,t:"Northern plain",s:"A smooth northern plain where radar suggests shallow ice."},
+ {id:"ama",n:"Amazonis Planitia",ll:[24.8,-164.6],h:1,t:"Young lava plain",s:"One of the smoothest, youngest plains on Mars, shaped by lava flows."},
+ {id:"ars",n:"Arsia Mons",ll:[-8.4,-120.1],h:5,t:"Tharsis volcano",s:"A huge volcano in the Tharsis chain, with a broad summit caldera and steep flanks."}
+];
+const R=3389.5,KM_SOL=50,STOP_SOLS=2,MAX_SOLS=80,MAX_RISK=35,NEED=4,rad=Math.PI/180;
+const dist=(a,b)=>{const p=(b[0]-a[0])*rad,q=(b[1]-a[1])*rad,x=Math.sin(p/2)**2+Math.cos(a[0]*rad)*Math.cos(b[0]*rad)*Math.sin(q/2)**2;return 2*R*Math.asin(Math.sqrt(x))};
+const $=id=>document.getElementById(id);
+const byId=id=>SITES.find(s=>s.id===id);
+let route=["jez"],running=false,markers={},rover=null,line=null,trail=null;
+
+/* ---- Map ---- */
+const map=L.map("map",{crs:L.CRS.EPSG4326,center:[13,78],zoom:4,minZoom:1,maxZoom:8,zoomControl:false,fadeAnimation:false});
+L.control.zoom({position:"bottomright"}).addTo(map);
+/* ---- Procedural terrain: keeps the map looking like Mars when NASA tiles are offline ---- */
+const hash=(x,y)=>{const h=Math.sin(x*127.1+y*311.7)*43758.5453;return h-Math.floor(h)};
+const vn=(x,y)=>{const i=Math.floor(x),j=Math.floor(y),f=x-i,g=y-j,u=f*f*(3-2*f),v=g*g*(3-2*g);return hash(i,j)*(1-u)*(1-v)+hash(i+1,j)*u*(1-v)+hash(i,j+1)*(1-u)*v+hash(i+1,j+1)*u*v};
+const fbm=(x,y)=>{let a=.5,t=0;for(let o=0;o<5;o++){t+=a*vn(x,y);x*=2.03;y*=2.03;a*=.5}return t};
+const crat=(x,y,sc)=>{x*=sc;y*=sc;const i=Math.floor(x),j=Math.floor(y);let h=0;for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++){if(hash(i+a+2,j+b+7)<.72)continue;const cx=i+a+hash(i+a,j+b),cy=j+b+hash(j+b,i+a+9),r=.12+.3*hash(i+a+5,j+b+3),d=Math.hypot(x-cx,y-cy)/r;if(d<1)h-=(1-d*d)*r;else if(d<1.25)h+=(1.25-d)*r*.8}return h};
+const Terrain=L.GridLayer.extend({createTile(c){
+  const t=L.DomUtil.create("canvas","leaflet-tile"),N=128,g=t.getContext("2d");t.width=t.height=N;
+  const im=g.createImageData(N,N),W=2**c.z,e=.0006,H=(u,v)=>fbm(u*7,v*7)*2.4+crat(u,v,70)*.45+crat(u,v,16)*.55;
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    const u=(c.x+x/N)/W,v=(c.y+y/N)/W,h=H(u,v),sl=(H(u+e,v)-h)+(H(u,v+e)-h),
+      sh=Math.max(.5,Math.min(1.45,1+sl*26)),a=fbm(u*3+7,v*3+2),gr=.85+.3*vn(u*500,v*500),k=sh*gr,o=(y*N+x)*4;
+    im.data[o]=(150+a*85)*k;im.data[o+1]=(68+a*55)*k;im.data[o+2]=(40+a*35)*k;im.data[o+3]=255}
+  g.putImageData(im,0,0);return t}});
+new Terrain({tileSize:256,noWrap:true,keepBuffer:4,updateWhenIdle:false}).addTo(map);
+const trek=(name,attr)=>L.tileLayer(`https://trek.nasa.gov/tiles/Mars/EQ/${name}/1.0.0/default/default028mm/{z}/{y}/{x}.jpg`,{maxNativeZoom:6,maxZoom:8,noWrap:true,attribution:attr+" NASA/JPL, Mars Trek"}).on("tileerror",e=>e.tile.style.visibility="hidden");
+const elev=trek("Mars_MGS_MOLA_ClrShade_merge_global_463m","Elevation, MOLA.");
+const viking=trek("Viking_MDIM21_ClrMosaic_global_232m","Viking colour mosaic.");
+viking.addTo(map);
+const ctl=L.control.layers({"Surface (Viking colour)":viking,"Elevation (colour relief)":elev},null,{position:"topright"}).addTo(map);
+L.control.scale({imperial:false,position:"bottomright"}).addTo(map);
+
+SITES.forEach(s=>{
+  const m=L.marker(s.ll,{icon:L.divIcon({className:"",html:'<div class="beacon"></div>',iconSize:[22,22]}),title:s.n,keyboard:true}).addTo(map);
+  m.on("click",()=>pf&&!running?pfAdd(s.ll,s.n):select(s.id,MODE==="pf"));m.bindTooltip(s.n,{permanent:true,direction:s.id==="nilip"?"left":"bottom",offset:s.id==="nilip"?[-12,0]:[0,12],className:"tag"});
+  markers[s.id]=m;
+});
+
+/* ---- Camera and light ---- */
+const frame=()=>map.fitBounds(L.latLngBounds(route.map(r=>byId(r).ll)),{paddingTopLeft:innerWidth>800?[440,70]:[30,50],paddingBottomRight:[50,innerWidth>800?70:Math.round(innerHeight*.54)],maxZoom:6});
+const grade=k=>{const m=(a,b)=>Math.round(a+(b-a)*k);$("grade").style.background=`rgba(${m(255,40)},${m(170,80)},${m(90,180)},${(.28+.3*k).toFixed(2)})`};
+const ROVER='<svg viewBox="0 0 32 32"><g fill="#0e1a2b"><rect x="6" y="7" width="3" height="6" rx="1"/><rect x="6" y="14" width="3" height="6" rx="1"/><rect x="6" y="21" width="3" height="6" rx="1"/><rect x="23" y="7" width="3" height="6" rx="1"/><rect x="23" y="14" width="3" height="6" rx="1"/><rect x="23" y="21" width="3" height="6" rx="1"/></g><rect x="9" y="6" width="14" height="21" rx="3" fill="#e9eff6"/><rect x="12" y="9" width="8" height="6" rx="1.5" fill="#7fd6ff"/><circle cx="16" cy="4" r="2" fill="#f0b66b"/></svg>';
+/* ---- Story and cards ---- */
+const say=t=>{$("story").textContent=t};
+function log(sol,t){const p=document.createElement("p");p.innerHTML=`<b>Sol ${sol}.</b> ${t}`;$("log").prepend(p)}
+function select(id,quiet){
+  const s=byId(id),inR=route.includes(id);
+  if(!quiet)map.flyTo(s.ll,Math.max(map.getZoom(),5),{duration:.8});
+  $("card").innerHTML=`<h2>${s.n}</h2><p class="sub">${s.t}. Hazard ${s.h} of 5.</p><p>${s.s}</p>`+
+   (MODE==="pf"?`<p class="sub">Path finder is active. While it is waiting for a point, click a beacon to use it as a stop.</p>`:inR?`<p class="sub">Already on your route.</p>`:`<button class="go" id="add" ${running?"disabled":""}>Add to traverse</button>`);
+  const add=$("add");if(add)add.onclick=()=>addStop(id);
+}
+function addStop(id){
+  if(running||route.includes(id))return;
+  route.push(id);
+  const s=byId(id),legKm=dist(byId(route[route.length-2]).ll,s.ll);
+  say(`${s.n} is ${Math.round(legKm)} km from your last stop. The rover covers ${KM_SOL} km a sol, and every stop costs ${STOP_SOLS} sols of science.`);
+  update();select(id,true);
+  frame();
+}
+
+/* ---- Planning maths ---- */
+function plan(){
+  let km=0,safe=1;
+  for(let i=1;i<route.length;i++){
+    const a=byId(route[i-1]),b=byId(route[i]),d=dist(a.ll,b.ll);
+    km+=d;safe*=1-Math.min(.9,d/1000*((a.h+b.h)/2)*.05);
+  }
+  const sols=Math.ceil(km/KM_SOL)+(route.length-1)*STOP_SOLS;
+  return{km:Math.round(km),sols,risk:Math.round((1-safe)*100)};
+}
+function update(){
+  const p=plan();
+  $("sSols").textContent=p.sols;$("sKm").textContent=p.km;$("sRisk").textContent=p.risk+"%";
+  const bs=$("bSols"),br=$("bRisk");
+  bs.style.width=Math.min(100,p.sols/MAX_SOLS*100)+"%";bs.style.background=p.sols>MAX_SOLS?"var(--bad)":"var(--ok)";
+  br.style.width=Math.min(100,p.risk/MAX_RISK*100)+"%";br.style.background=p.risk>MAX_RISK?"var(--bad)":p.risk>MAX_RISK*.7?"var(--dust)":"var(--ok)";
+  $("route").innerHTML=route.map((id,i)=>{const s=byId(id);return`<li>${s.n}${i?` <small>${Math.round(dist(byId(route[i-1]).ll,s.ll))} km</small>`:" <small>landing</small>"}</li>`}).join("");
+  if(route.length>1&&!running&&MODE==="trv")trvDock();
+  const ok=route.length>=NEED&&p.sols<=MAX_SOLS&&p.risk<=MAX_RISK;
+  let msg=`Visit at least ${NEED} sites within ${MAX_SOLS} sols and ${MAX_RISK}% risk. `;
+  if(p.sols>MAX_SOLS)msg="Too many sols. Drop a long leg or pick closer stops.";
+  else if(p.risk>MAX_RISK)msg="Too risky. Favour flat ground like Isidis over caldera and mountain rims.";
+  else if(route.length<NEED)msg+=`${NEED-route.length} more stop${NEED-route.length>1?"s":""} needed.`;
+  else msg="This traverse meets every limit. Launch when ready.";
+  const v=$("verdict");v.textContent=msg;v.className="sub "+(ok?"ok":(p.sols>MAX_SOLS||p.risk>MAX_RISK?"bad":""));
+  $("launch").disabled=running||!ok;$("undo").disabled=running||route.length<2;$("reset").disabled=running;$("sample").disabled=running;$("launch").title=ok?"":"Add at least 4 sites within the limits first";$("undo").title=route.length<2?"Nothing to undo yet":"";
+  Object.entries(markers).forEach(([id,m])=>m.getElement().firstChild.classList.toggle("in",route.includes(id)));
+  if(line)map.removeLayer(line);
+  line=L.polyline(route.map(id=>byId(id).ll),{color:p.risk>MAX_RISK?"#ff7b8a":"#7fd6ff",weight:4,dashArray:"2 9",lineCap:"round"}).addTo(map);
+}
+
+/* ---- Traverse animation and debrief ---- */
+const tween=(ms,fn)=>new Promise(r=>{const t0=performance.now();(function f(t){const k=Math.max(0,Math.min(1,(t-t0)/ms));fn(k);k<1?requestAnimationFrame(f):r()})(t0)});
+async function launch(){
+  running=true;update();$("log").innerHTML="";
+  [rover,trail].forEach(l=>l&&map.removeLayer(l));
+  const P=plan(),reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;let sol=0,done=0;
+  map.setView(byId(route[0]).ll,6,{animate:false});
+  trail=L.polyline([],{color:"#2a120a",weight:3,opacity:.6,lineCap:"round"}).addTo(map);
+  rover=L.marker(byId(route[0]).ll,{icon:L.divIcon({className:"",html:`<div class="rover">${ROVER}</div>`,iconSize:[38,38],iconAnchor:[19,19]}),interactive:false,zIndexOffset:900}).addTo(map);
+  log(0,byId("jez").s);say("Sol 0. Engines cold, crew strapped in, the first leg is plotted.");
+  for(let i=1;i<route.length;i++){
+    const a=byId(route[i-1]),b=byId(route[i]),d=dist(a.ll,b.ll),drive=Math.ceil(d/KM_SOL),start=sol;
+    const brg=Math.atan2((b.ll[1]-a.ll[1])*Math.cos(a.ll[0]*rad),b.ll[0]-a.ll[0])/rad;
+    rover.getElement().querySelector("svg").style.transform=`rotate(${brg}deg)`;
+    say(`Driving from ${a.n} to ${b.n}, ${Math.round(d)} km. Hazard rating ${b.h} of 5 at the destination.`);
+    await tween(reduce?10:Math.min(4200,1200+d*3.5),k=>{
+      const ll=[a.ll[0]+(b.ll[0]-a.ll[0])*k,a.ll[1]+(b.ll[1]-a.ll[1])*k];
+      rover.setLatLng(ll);trail.addLatLng(ll);map.panTo(ll,{animate:false});if(TR&&DK===TR)drawProfile(Math.round((done+d*k)/P.km*(TR.P.d.length-1)));
+      $("sSols").textContent=start+Math.round(drive*k);grade((done+d*k)/P.km);
+    });
+    done+=d;sol=start+drive;
+    log(sol,`Arrived at ${b.n}. ${b.s}`);say(b.s);
+    await tween(reduce?10:900,()=>{});
+    sol+=STOP_SOLS;$("sSols").textContent=sol;
+  }
+  say(`The crew is home safe after ${P.km} km and ${P.sols} sols. Risk carried: ${P.risk}%. Every site you chose is now a waypoint on the first human map of Mars.`);
+  log(sol,`Traverse complete. ${route.length} sites visited.`);
+  running=false;update();frame();
+}
+
+/* ---- Controls ---- */
+$("launch").onclick=launch;
+$("sample").onclick=()=>{if(running)return;route=["jez","nili","syr","isi"];update();frame();select("isi",true);say("A sample traverse: Jezero, Nili Fossae, Syrtis Major and Isidis Planitia. It meets every limit, so press Launch traverse.")};
+$("undo").onclick=()=>{if(route.length>1){route.pop();update();say("Last stop removed. Choose another beacon.")}};
+$("reset").onclick=()=>{route=["jez"];fit();[rover,trail].forEach(l=>l&&map.removeLayer(l));rover=trail=null;grade(0);$("log").innerHTML="";update();intro()};
+function intro(){
+  say("Sol 0. A thin blue sunset fades over Jezero. Your crew of four has landed, and you hold the map. Choose beacons across the basin to build a traverse of at least four sites within 80 sols, without letting the risk climb above 35%.");
+  select("jez",true);
+}
+const fit=()=>map.fitBounds(L.latLngBounds([-2,62],[28,95]),{paddingTopLeft:innerWidth>800?[430,20]:[20,20],paddingBottomRight:[20,innerWidth>800?20:Math.round(innerHeight*.54)],animate:false});
+fit();
+update();intro();
+/* ---- 3D view: same terrain function as the 2D map, lifted into three.js ---- */
+const HT=(la,lo)=>{const u=(lo+180)/180,v=(90-la)/180;return fbm(u*7,v*7)*2.4+crat(u,v,70)*.45+crat(u,v,16)*.55};
+const KZ=59.2;let C3={la:13,lo:78.5},S3=1,VE=20,EXT=1900;
+const P3=(la,lo)=>new THREE.Vector3((lo-C3.lo)*KZ*Math.cos(la*rad),zAt(la,lo)/1000*VE,-(la-C3.la)*KZ);
+let V=null;
+function init3D(){
+  const cv=$("c3"),r=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true}),sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(55,1,1,7000);
+  r.setPixelRatio(Math.min(devicePixelRatio,2));r.xr.enabled=true;
+  sc.fog=new THREE.Fog(0xc98a63,1100,4600);
+  sc.add(new THREE.HemisphereLight(0x7fa4d8,0x6b2f1a,.7));
+  const sun=new THREE.DirectionalLight(0xffc48a,1.5);sun.position.set(-3000,1000,-1800);sc.add(sun);
+  const world=new THREE.Group();sc.add(world);
+  const rv=new THREE.Group(),M=(c,e)=>new THREE.MeshStandardMaterial({color:c,roughness:.6,emissive:e||0});
+  const body=new THREE.Mesh(new THREE.BoxGeometry(14,5,22),M(0xe9eff6));body.position.y=8;rv.add(body);
+  const mast=new THREE.Mesh(new THREE.BoxGeometry(1.4,9,1.4),M(0x9db0c4));mast.position.set(0,14,-6);rv.add(mast);
+  const eye=new THREE.Mesh(new THREE.SphereGeometry(2.2,12,8),M(0x7fd6ff,0x7fd6ff));eye.position.set(0,19,-6);rv.add(eye);
+  [-8.5,8.5].forEach(x=>[-8,0,8].forEach(z=>{const w=new THREE.Mesh(new THREE.CylinderGeometry(3.4,3.4,3,14),M(0x1a1410));w.rotation.z=Math.PI/2;w.position.set(x,3.4,z);rv.add(w)}));
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(1.6,10,8),M(0xf0b66b,0xf0b66b));nose.position.set(0,8,-11.5);rv.add(nose);
+  world.add(rv);
+  const ctl=new THREE.OrbitControls(cam,cv);ctl.maxPolarAngle=1.45;ctl.maxDistance=4200;
+  cam.position.set(0,1200,1500);ctl.target.set(0,0,0);ctl.update();
+  r.xr.addEventListener("sessionstart",()=>{sc.fog=null;world.scale.setScalar(1.1/EXT);world.position.set(0,.9,-1.1)});
+  r.xr.addEventListener("sessionend",()=>{sc.fog=new THREE.Fog(0xc98a63,1100,4600);world.scale.setScalar(1);world.position.set(0,0,0)});
+  if(navigator.xr)navigator.xr.isSessionSupported("immersive-vr").then(ok=>{if(ok)$("bar3").appendChild(VRButton.createButton(r))}).catch(()=>{});
+  return{r,sc,cam,ctl,world,rv,rg:new THREE.Group(),chase:false,last:0,dir:new THREE.Vector3(0,0,-1)};
+}
+function label(txt){
+  const c=document.createElement("canvas");c.width=512;c.height=96;const x=c.getContext("2d");
+  x.fillStyle="rgba(14,26,43,.88)";x.fillRect(0,0,512,96);x.fillStyle="#e9eff6";x.font="44px Georgia";x.textAlign="center";x.fillText(txt,256,63);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,fog:false}));sp.scale.set(190,36,1);return sp;
+}
+function bounds3(P){const la=P.map(q=>q[0]),lo=P.map(q=>q[1]);const a=Math.min(...la),b=Math.max(...la),c=Math.min(...lo),d=Math.max(...lo),mh=Math.max(6,(b-a)*.25),mw=Math.max(6,(d-c)*.25);return{a:Math.max(-85,a-mh),b:Math.min(85,b+mh),c:Math.max(-180,c-mw),d:Math.min(180,d+mw)}}
+function terrain3D(bn){
+  const v=V,N=220,pos=[],zs=[],col=[],idx=[];C3.la=(bn.a+bn.b)/2;C3.lo=(bn.c+bn.d)/2;
+  const wk=(bn.d-bn.c)*KZ*Math.cos(C3.la*rad),hk=(bn.b-bn.a)*KZ;EXT=Math.max(wk,hk,300);S3=EXT/1900;VE=20;
+  for(let j=0;j<=N;j++)for(let i=0;i<=N;i++){const la=bn.b-(bn.b-bn.a)*j/N,lo=bn.c+(bn.d-bn.c)*i/N,z=zAt(la,lo);zs.push(z);pos.push((lo-C3.lo)*KZ*Math.cos(la*rad),z/1000*VE,-(la-C3.la)*KZ)}
+  let z0=1e9,z1=-1e9;zs.forEach(z=>{z0=Math.min(z0,z);z1=Math.max(z1,z)});zs.forEach(z=>{const t=(z-z0)/((z1-z0)||1);col.push(.42+.45*t,.2+.42*t,.12+.33*t)});
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){const a=j*(N+1)+i,c=a+N+1;idx.push(a,c,a+1,a+1,c,c+1)}
+  const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));g.setAttribute("color",new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);g.computeVertexNormals();
+  if(v.tm){v.world.remove(v.tm);v.tm.geometry.dispose()}
+  v.tm=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1}));v.world.add(v.tm);
+}
+function build3D(){
+  const v=V;terrain3D(bounds3(PF3&&pfSel?pfSel.pts:route.map(id=>byId(id).ll)));
+  v.cam.far=EXT*4;v.cam.position.set(0,.63*EXT,.79*EXT);v.ctl.target.set(0,0,0);v.ctl.maxDistance=EXT*2.2;v.cam.updateProjectionMatrix();v.sc.fog.near=.58*EXT;v.sc.fog.far=2.4*EXT;v.ctl.update();v.rv.scale.setScalar(S3);v.world.remove(v.rg);v.rg=new THREE.Group();v.world.add(v.rg);
+  const pts=[],stops=[0],use=PF3&&pfSel;
+  if(use){pfSel.pts.forEach(q=>pts.push(P3(...q)));stops.push(pts.length-1)}else for(let i=1;i<route.length;i++){const a=byId(route[i-1]).ll,b=byId(route[i]).ll;for(let k=i>1?1:0;k<=60;k++){const f=k/60;pts.push(P3(a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f))}stops.push(pts.length-1)}
+  if(!pts.length)pts.push(P3(...byId("jez").ll));
+  Object.assign(v,{path:pts,stops,t:0,pause:0,si:1,done:false});
+  if(pts.length>1)v.rg.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(p=>p.clone().setY(p.y+3*S3))),pts.length*2,3*S3,6),new THREE.MeshBasicMaterial({color:0x7fd6ff,fog:false})));
+  (use?[{n:"Start",ll:pfSel.pts[0]},{n:"Destination",ll:pfSel.pts[pfSel.pts.length-1]}]:route.map(byId)).forEach(s=>{const p=P3(...s.ll),grp=new THREE.Group();
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(1,1,80,6),new THREE.MeshBasicMaterial({color:0xf0b66b}));pole.position.y=40;
+    const orb=new THREE.Mesh(new THREE.SphereGeometry(6,14,10),new THREE.MeshBasicMaterial({color:0xfff3d0}));orb.position.y=84;
+    const lb=label(s.n);lb.position.y=118;grp.add(pole,orb,lb);grp.scale.setScalar(S3);grp.position.copy(p);v.rg.add(grp)});
+  say3(use?"The rover sets out along your chosen route.":route.length<2?"Add stops in the planner to see your traverse here. Drag to look around.":"Sol 0. The rover leaves Jezero.",`Drag to orbit, scroll to zoom. Relief is exaggerated ${Math.round(VE)} times.`);
+}
+const say3=(t,sm)=>{$("cap3").innerHTML=t+(sm?`<small>${sm}</small>`:"")};
+function loop(now){
+  const v=V,dt=Math.min(.1,(now-(v.last||now))/1000);v.last=now;
+  const N=v.path.length;
+  if(N>1&&!v.done){
+    if(v.pause>0)v.pause-=dt;else{
+      v.t=Math.min(N-1,v.t+dt*(N-1)/45);
+      if(v.si<v.stops.length&&v.t>=v.stops[v.si]){const s=PF3&&pfSel?{n:"Destination",s:`The ${pfSel.nm.toLowerCase()} route is complete: ${pfSel.km} km, ${pfSel.risk}% modelled risk.`}:byId(route[v.si]);v.t=v.stops[v.si];v.si++;v.pause=2.8;say3(`<b>${s.n}.</b> ${s.s}`,v.si>=v.stops.length?"Traverse complete. Press Replay to drive it again.":"");if(v.si>=v.stops.length)v.done=true}}
+  }
+  const i=Math.floor(v.t),j=Math.min(i+1,N-1),p=v.path[i].clone().lerp(v.path[j],v.t-i);
+  const d=v.path[j].clone().sub(v.path[i]);d.y=0;if(d.lengthSq()>1e-3)v.dir.copy(d.normalize());
+  v.rv.position.copy(p);v.rv.rotation.y=Math.atan2(-v.dir.x,-v.dir.z);
+  if(v.chase&&!v.r.xr.isPresenting){
+    v.cam.position.lerp(p.clone().addScaledVector(v.dir,-75*S3).add(new THREE.Vector3(0,38*S3,0)),.08);
+    v.cam.lookAt(p.clone().addScaledVector(v.dir,70*S3).add(new THREE.Vector3(0,6*S3,0)));
+  }else v.ctl.update();
+  v.r.render(v.sc,v.cam);
+}
+function size3(){V.r.setSize(innerWidth,innerHeight,false);V.cam.aspect=innerWidth/innerHeight;V.cam.updateProjectionMatrix()}
+function open3D(){
+  $("v3").hidden=false;
+  try{if(!V){V=init3D();addEventListener("resize",()=>V&&size3())}size3();build3D();V.last=0;V.r.setAnimationLoop(loop)}
+  catch(e){say3("3D needs WebGL, which this browser cannot start.","Try Chrome or Edge with hardware acceleration on.")}
+}
+const close3=()=>{$("v3").hidden=true;V&&V.r.setAnimationLoop(null)};
+$("b3").onclick=()=>{PF3=false;open3D()};$("x3").onclick=close3;addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("v3").hidden)close3()});
+$("m3").onclick=()=>{V.chase=!V.chase;V.ctl.enabled=!V.chase;$("m3").textContent=V.chase?"Orbit view":"Chase view"};
+$("r3").onclick=()=>{Object.assign(V,{t:0,pause:0,si:1,done:false});say3("Sol 0. The rover leaves Jezero.")};
+
+/* ---- Elevation grid, slope hazard and path finder ---- */
+const G={la0:89.75,lo0:-179.75,st:.5,nx:720,ny:360,src:"stand-in"};
+const ll=(i,j)=>[G.la0-j*G.st,G.lo0+i*G.st],pfg=L.layerGroup().addTo(map);let hz=null,pf=false,pfPts=[];
+function slopes(){
+  const{nx,ny,z}=G,dy=G.st*59.2*1000;G.S=new Float32Array(nx*ny);G.DX=new Float32Array(ny);
+  for(let j=0;j<ny;j++){const dx=Math.max(.05,Math.cos((G.la0-j*G.st)*rad))*G.st*59.2*1000;G.DX[j]=dx/1000;
+    for(let i=0;i<nx;i++){const a=j*nx+Math.min(nx-1,i+1),b=j*nx+Math.max(0,i-1),c=Math.min(ny-1,j+1)*nx+i,d=Math.max(0,j-1)*nx+i;
+      G.S[j*nx+i]=Math.atan(Math.hypot((z[a]-z[b])/(2*dx),(z[c]-z[d])/(2*dy)))/rad}}
+}
+var RAMP_MAX=10;
+function buildGrid(){
+  if(G.src==="stand-in"){G.z=new Float32Array(G.nx*G.ny);for(let j=0;j<G.ny;j++)for(let i=0;i<G.nx;i++)G.z[j*G.nx+i]=HT(...ll(i,j))*15000;
+    slopes();const k=5/([...G.S].sort((a,b)=>a-b)[Math.floor(G.S.length*.95)]||1);G.z=G.z.map(v=>v*k);const m=G.z.reduce((a,b)=>a+b)/G.z.length;G.z=G.z.map(v=>v-m)}
+  slopes();
+  RAMP_MAX=G.src==="real MOLA"?Math.max(1,[...G.S].sort((a,b)=>a-b)[Math.floor(G.S.length*.99)]):10;
+  const c=document.createElement("canvas");c.width=G.nx;c.height=G.ny;const x=c.getContext("2d"),im=x.createImageData(G.nx,G.ny);
+  G.S.forEach((sv,k)=>{const t=Math.min(1,sv/RAMP_MAX);im.data.set([t<.5?t*510:255,t<.5?200:200*(2-2*t),70,255],k*4)});
+  x.putImageData(im,0,0);
+  if(hz){ctl.removeLayer(hz);map.removeLayer(hz)}
+  hz=L.imageOverlay(c.toDataURL(),[[G.la0-(G.ny-1)*G.st,G.lo0],[G.la0,G.lo0+(G.nx-1)*G.st]],{opacity:.5}).addTo(map);
+  ctl.addOverlay(hz,"Slope hazard (green flat, red steep)");
+  $("src").textContent=G.src==="real MOLA"?"Elevation: real NASA MOLA data. Colours are scaled to the steepest 1% of Mars at this 30 km resolution.":"Elevation: stand-in terrain. Run prepare_data.py to load real NASA MOLA elevation.";
+}
+fetch("data/mola.json").then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(d.nx!==720||d.ny!==360)throw 0;Object.assign(G,{nx:d.nx,ny:d.ny,z:Float32Array.from(d.z),src:"real MOLA"});buildGrid()}).catch(()=>{});
+buildGrid();
+const cell=(la,lo)=>Math.max(0,Math.min(G.ny-1,Math.round((G.la0-la)/G.st)))*G.nx+Math.max(0,Math.min(G.nx-1,Math.round((lo-G.lo0)/G.st)));
+function dij(s,t,w){
+  const n=G.nx*G.ny,d=new Float32Array(n).fill(1e9),p=new Int32Array(n).fill(-1),h=[[0,s]];d[s]=0;
+  const push=e=>{h.push(e);let i=h.length-1;while(i>0){const q=(i-1)>>1;if(h[q][0]<=h[i][0])break;[h[q],h[i]]=[h[i],h[q]];i=q}};
+  const pop=()=>{const top=h[0],l=h.pop();if(h.length){h[0]=l;let i=0;for(;;){const a=2*i+1,b=a+1;let m=i;if(a<h.length&&h[a][0]<h[m][0])m=a;if(b<h.length&&h[b][0]<h[m][0])m=b;if(m===i)break;[h[m],h[i]]=[h[i],h[m]];i=m}}return top};
+  while(h.length){const[c,u]=pop();if(u===t)break;if(c>d[u])continue;const ui=u%G.nx,uj=(u/G.nx)|0;
+    for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){const vi=ui+di,vj=uj+dj;if((!di&&!dj)||vi<0||vj<0||vi>=G.nx||vj>=G.ny)continue;
+      const v=vj*G.nx+vi,nc=c+Math.hypot(di*G.DX[uj],dj*G.st*59.2)*(1+w*(((G.S[u]+G.S[v])/2)/1.5)**2);if(nc<d[v]){d[v]=nc;p[v]=u;push([nc,v])}}}
+  const out=[];for(let u=t;u!==-1;u=p[u])out.push(ll(u%G.nx,(u/G.nx)|0));return out.reverse();
+}
+function evalPath(pts){
+  let km=0,safe=1,mx=0;
+  for(let i=1;i<pts.length;i++){const d=dist(pts[i-1],pts[i]),sv=G.S[cell(...pts[i-1])];km+=d;mx=Math.max(mx,sv);safe*=1-Math.min(.9,d*.00002*(1+(sv/1.5)**2)*(1+storm()*1.5))}
+  return{km:Math.round(km),sols:Math.ceil(km/(KM_SOL*(1-storm()*.4))),risk:Math.round((1-safe)*100),raw:1-safe,mx:mx.toFixed(1)};
+}
+function solve(keep){
+  const a=pfPts[0],b=pfPts[pfPts.length-1],ln=(p,q)=>{const n=Math.max(2,Math.ceil(dist(p,q)/10));return Array.from({length:n+1},(_,k)=>[p[0]+(q[0]-p[0])*k/n,p[1]+(q[1]-p[1])*k/n])};
+  const dj=(p,q,w)=>[p,...dij(cell(...p),cell(...q),w),q],join=A=>A.reduce((o,t,i)=>o.concat(i?t.slice(1):t),[]),ev=pts=>({pts,...evalPath(pts)});
+  const segs=pfPts.slice(1).map((q,i)=>{const p=pfPts[i],C=[ln(p,q),dj(p,q,.2),dj(p,q,1),dj(p,q,3)].map(ev);return{C,best:C.slice().sort((x,y)=>x.raw-y.raw||x.km-y.km)[0]}});
+  const F=ev(join(segs.map(t=>t.C[0].pts))),B=ev(join(segs.map(t=>t.C[1].pts))),Sf=ev(join(segs.map(t=>t.best.pts)));
+  const R=[{nm:"Fastest",c:"#ff7b8a",...F},{nm:"Balanced",c:"#f0b66b",...B},{nm:"Safest",c:"#7be0a4",...Sf}];
+  $("pft").innerHTML="<tr><th>Route</th><th>km</th><th>sols</th><th>risk</th><th>max slope</th></tr>"+R.map(r=>`<tr><td style="color:${r.c}">${r.nm}</td><td>${r.km}</td><td>${r.sols}</td><td>${r.risk}%</td><td>${r.mx}°</td></tr>`).join("");
+  pfR=R;pfEnds=pfPts.slice();R.forEach(r=>r.P=profile(r));pfL.forEach(l=>pfg.removeLayer(l));pfL=R.map(r=>L.polyline(r.pts,{color:r.c,weight:3,opacity:.95}).addTo(pfg));
+  R.forEach((_,i)=>{const tr=$("pft").rows[i+1];tr.style.cursor="pointer";tr.title="Click to select this route";tr.onclick=()=>pick(i)});pick(keep?selIdx:2);
+  const f=R[0],sf=R[2];
+  say(sf.raw<f.raw-.0005?`The safest path adds ${sf.km-f.km} km but cuts risk from ${f.risk}% to ${sf.risk}%, steering around the steepest ground. That is the trade a real crew would weigh.`:"On this stretch the straight line is already the safest. Try points with rough ground between them.");
+  if(!keep)$("pft").scrollIntoView({block:"nearest"});if(!keep)map.fitBounds(L.latLngBounds(pfPts),{paddingTopLeft:innerWidth>800?[440,60]:[30,40],paddingBottomRight:[50,innerWidth>800?60:Math.round(innerHeight*.54)]});
+}
+const inRegion=q=>q[0]<=G.la0&&q[0]>=G.la0-(G.ny-1)*G.st&&q[1]>=G.lo0&&q[1]<=G.lo0+(G.nx-1)*G.st;
+let pfNames=[],adding=false;
+const crosshair=on=>map.getContainer().style.cursor=on?"crosshair":"";
+function pfStart(){pf=true;adding=false;pfPts=[];pfNames=[];pfg.clearLayers();pfL=[];$("pft").innerHTML="";$("pfa").hidden=true;say("Path finder. Click a start point on the map, or click one of the named beacons. Then choose your destination.");$("pf").textContent="Now click the START point";crosshair(true)}
+$("pf").onclick=()=>{if(pfPts.length>=2){pf=true;$("pf").textContent="Now click the NEXT stop";crosshair(true);say("Click a point or beacon to extend the route with another stop.");return}pfStart()};
+$("pnew").onclick=pfStart;
+function pfAdd(q,name){
+  if(!inRegion(q)){say("That point is outside the analysed region so slopes are unknown there.");return}
+  pfPts.push(q);pfNames.push(name||"Stop "+pfPts.length);
+  L.circleMarker(q,{radius:7,color:"#fff",weight:2,fillColor:"#7fd6ff",fillOpacity:1}).bindTooltip(pfNames[pfNames.length-1],{permanent:true,direction:"top",className:"tag"}).addTo(pfg);
+  if(pfPts.length===1){say("Start set. Now choose your destination.");$("pf").textContent="Now click the DESTINATION"}
+  else{pf=false;crosshair(false);$("pf").textContent="Add another stop";solve()}
+}
+function mk(s){const m=L.marker(s.ll,{icon:L.divIcon({className:"",html:'<div class="beacon"></div>',iconSize:[22,22]}),title:s.n}).addTo(map);m.on("click",()=>pf&&!running?pfAdd(s.ll,s.n):select(s.id,MODE==="pf"));m.bindTooltip(s.n,{permanent:true,direction:"bottom",offset:[0,12],className:"tag"});markers[s.id]=m}
+map.on("zoomend",()=>map.getContainer().classList.toggle("lowzoom",map.getZoom()<4));
+$("pall").onclick=()=>map.fitBounds([[-80,-180],[80,180]],{paddingTopLeft:innerWidth>800?[430,20]:[20,20]});
+$("padd").onclick=()=>{adding=true;pf=false;crosshair(true);say("Add a place. Click the plain, basin or crater you want astronauts to travel to, then name it.")};
+map.on("click",e=>{
+  if(adding){const q=[e.latlng.lat,e.latlng.lng];if(!inRegion(q)){say("That spot is outside the analysed region, so it can't be routed to yet. Click inside the shaded area.");return}
+    const nm=(prompt("Name this place (for example, Amenthes Planum)")||"").trim();adding=false;crosshair(false);if(!nm){say("No place added.");return}
+    const sv=G.S[cell(...q)],st={id:"u"+SITES.length,n:nm,ll:q,h:Math.max(1,Math.min(5,Math.round(1+sv/2))),t:"Your place",s:`Added by you. The ground here slopes about ${sv.toFixed(1)} degrees. It can now be a path-finder stop or a traverse stop.`};
+    SITES.push(st);mk(st);select(st.id,true);say(nm+" added. Click it to use it in the path finder or the traverse planner.");return}
+  if(!pf||running)return;pfAdd([e.latlng.lat,e.latlng.lng]);
+});
+
+/* ---- Route analytics, drive and export ---- */
+var MODE="trv";let DK=null,TR=null,bars=[],selIdx=2,pfR=[],pfL=[],pfSel=null,pfEnds=null,hov=null,PF3=false;
+const storm=()=>+$("storm").value/100;
+const zAt=(la,lo)=>{const fi=Math.max(0,Math.min(G.nx-1.001,(lo-G.lo0)/G.st)),fj=Math.max(0,Math.min(G.ny-1.001,(G.la0-la)/G.st)),i=fi|0,j=fj|0,u=fi-i,v=fj-j,z=G.z,n=G.nx;return z[j*n+i]*(1-u)*(1-v)+z[j*n+i+1]*u*(1-v)+z[(j+1)*n+i]*(1-u)*v+z[(j+1)*n+i+1]*u*v};
+const ramp=sv=>{const t=Math.min(1,sv/RAMP_MAX);return`rgb(${Math.round(t<.5?t*510:255)},${Math.round(t<.5?200:200*(2-2*t))},70)`};
+function profile(r){const d=[0],z=[zAt(...r.pts[0])],sl=[G.S[cell(...r.pts[0])]];for(let i=1;i<r.pts.length;i++){d.push(d[i-1]+dist(r.pts[i-1],r.pts[i]));z.push(zAt(...r.pts[i]));sl.push(G.S[cell(...r.pts[i])])}return{d,z,sl}}
+function cv(id){const c=$(id),k=devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;c.width=w*k;c.height=h*k;const x=c.getContext("2d");x.scale(k,k);x.font="11px system-ui";return{x,w,h}}
+function drawProfile(ci){
+  const r=DK;if(!r)return;const P=r.P,{x,w,h}=cv("cp"),zs=Math.min(...P.z),ze=Math.max(...P.z),L0=44,B=18,T=P.d[P.d.length-1]||1,X=d=>L0+d/T*(w-L0-6),Y=z=>8+(1-(z-zs)/((ze-zs)||1))*(h-8-B);
+  x.fillStyle="#9db0c4";x.fillText(Math.round(ze)+" m",0,14);x.fillText(Math.round(zs)+" m",0,h-B);x.fillText("0 km",L0,h-4);x.textAlign="right";x.fillText(r.km+" km",w-4,h-4);x.textAlign="left";
+  for(let i=1;i<P.d.length;i++){x.fillStyle=ramp(P.sl[i]);x.beginPath();x.moveTo(X(P.d[i-1]),h-B);x.lineTo(X(P.d[i-1]),Y(P.z[i-1]));x.lineTo(X(P.d[i]),Y(P.z[i]));x.lineTo(X(P.d[i]),h-B);x.fill()}
+  x.strokeStyle="#e9eff6";x.lineWidth=1.5;x.beginPath();P.z.forEach((v,i)=>i?x.lineTo(X(P.d[i]),Y(v)):x.moveTo(X(P.d[0]),Y(v)));x.stroke();
+  if(ci!=null){const px=X(P.d[ci]);x.strokeStyle="#7fd6ff";x.beginPath();x.moveTo(px,4);x.lineTo(px,h-B);x.stroke();x.fillStyle="#e9eff6";x.fillText(`${Math.round(P.d[ci])} km, ${Math.round(P.z[ci])} m, slope ${P.sl[ci].toFixed(1)}°`,Math.min(px+6,w-150),12)}
+}
+function drawBars(){const B3=bars===pfR;
+  const{x,w,h}=cv("cb"),mx=Math.max(...bars.map(r=>r.risk),1),bw=(w-20)/Math.max(3,bars.length);x.fillStyle="#9db0c4";x.fillText(B3?"Slope risk by route (%)":"Slope risk by leg (%)",0,11);
+  bars.forEach((r,i)=>{const bh=(h-64)*r.risk/mx+2,bx=10+i*bw+bw*.2,ww=bw*.6;x.globalAlpha=!B3||r===pfSel?1:.45;x.fillStyle=r.c;x.fillRect(bx,h-28-bh,ww,bh);x.globalAlpha=1;x.textAlign="center";x.fillStyle="#e9eff6";x.fillText(r.risk+"%",bx+ww/2,h-32-bh);x.fillStyle="#9db0c4";x.fillText(r.nm,bx+ww/2,h-14);x.fillText(r.km+" km",bx+ww/2,h-2);x.textAlign="left"});
+}
+function dock(){
+  const r=DK,P=r.P;let g=0,l=0,st=0;for(let i=1;i<P.z.length;i++){const dz=P.z[i]-P.z[i-1];dz>0?g+=dz:l-=dz;if(P.sl[i]>3)st+=P.d[i]-P.d[i-1]}
+  $("dock").hidden=false;$("dkn").textContent=(r.nm==="Your traverse"?r.nm:r.nm+" route selected")+". Colour shows slope: green gentle, red steep.";
+  $("dkc").innerHTML=[["Distance",r.km+" km"],["Drive time",r.sols+" sols"],["Slope risk",r.risk+"%"],["Steepest",r.mx+"°"],["Ground over 3°",Math.round(st)+" km"],["Climb",Math.round(g)+" m"],["Descent",Math.round(l)+" m"]].concat(storm()?[["Dust storm",Math.round(storm()*100)+"%"]]:[]).map(([a,b])=>`<span>${a} <b>${b}</b></span>`).join("");
+  drawProfile();drawBars();
+}
+function pick(i){bars=pfR;selIdx=i;pfSel=DK=pfR[i];pfL.forEach((l,k)=>{l.setStyle({weight:k===i?7:3,opacity:k===i?1:.5});if(k===i)l.bringToFront()});[...$("pft").rows].forEach((tr,k)=>tr.style.background=k===i+1?"rgba(127,214,255,.14)":"");$("pfa").hidden=false;dock()}
+$("cp").onmousemove=e=>{if(!DK)return;const P=DK.P,rc=e.target.getBoundingClientRect(),t=Math.max(0,Math.min(1,(e.clientX-rc.left-44)/(rc.width-50)))*P.d[P.d.length-1];let i=P.d.findIndex(v=>v>=t);if(i<0)i=P.d.length-1;drawProfile(i);if(hov)hov.setLatLng(DK.pts[i]);else hov=L.circleMarker(DK.pts[i],{radius:7,color:"#fff",fillColor:"#7fd6ff",fillOpacity:1}).addTo(map)};
+$("cp").onmouseleave=()=>{if(hov){map.removeLayer(hov);hov=null}drawProfile()};
+$("dkx").onclick=()=>$("dock").hidden=true;
+addEventListener("resize",()=>{if(DK&&!$("dock").hidden){drawProfile();drawBars()}});
+$("storm").oninput=()=>{if(pfEnds){pfPts=pfEnds;solve(true)}};
+async function drive(){
+  if(running||!pfSel)return;running=true;update();[rover,trail].forEach(l=>l&&map.removeLayer(l));
+  const pts=pfSel.pts,reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
+  trail=L.polyline([],{color:"#2a120a",weight:3,opacity:.6}).addTo(map);
+  rover=L.marker(pts[0],{icon:L.divIcon({className:"",html:`<div class="rover">${ROVER}</div>`,iconSize:[38,38],iconAnchor:[19,19]}),interactive:false,zIndexOffset:900}).addTo(map);
+  map.setView(pts[0],6,{animate:false});say(`Driving the ${pfSel.nm.toLowerCase()} route: ${pfSel.km} km over ${pfSel.sols} sols. Watch the profile for the climbs.`);
+  await tween(reduce?10:Math.min(15000,3500+pfSel.km*4),k=>{const i=Math.min(pts.length-1,Math.floor(k*(pts.length-1))),n=pts[Math.min(i+1,pts.length-1)],ll=pts[i];
+    rover.getElement().querySelector("svg").style.transform=`rotate(${Math.atan2((n[1]-ll[1])*Math.cos(ll[0]*rad),n[0]-ll[0])/rad}deg)`;
+    rover.setLatLng(ll);trail.addLatLng(ll);map.panTo(ll,{animate:false});drawProfile(i);grade(k)});
+  running=false;update();say(`Arrival. ${pfSel.km} km in ${pfSel.sols} sols with ${pfSel.risk}% modelled risk. Press a different row in the table to compare another route.`);
+}
+$("pdrive").onclick=drive;
+$("p3d").onclick=()=>{PF3=true;open3D()};
+$("pexp").onclick=()=>{const g={type:"Feature",properties:{route:pfSel.nm,km:pfSel.km,sols:pfSel.sols,riskPercent:pfSel.risk,maxSlopeDegrees:+pfSel.mx},geometry:{type:"LineString",coordinates:pfSel.pts.map(q=>[q[1],q[0]])}},a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(g,null,1)],{type:"application/geo+json"}));a.download="mars-route-"+pfSel.nm.toLowerCase()+".geojson";a.click()};
+
+function trvDock(){
+  const pts=[],legs=[];
+  for(let i=1;i<route.length;i++){const a=byId(route[i-1]).ll,b=byId(route[i]).ll,seg=Array.from({length:31},(_,k)=>[a[0]+(b[0]-a[0])*k/30,a[1]+(b[1]-a[1])*k/30]);pts.push(...(i>1?seg.slice(1):seg));legs.push({nm:"Leg "+i,c:"#7fd6ff",...evalPath(seg)})}
+  const T={nm:"Your traverse",c:"#7fd6ff",pts,...evalPath(pts)};T.P=profile(T);TR=T;DK=T;bars=legs;dock();
+}
+
+function setMode(m){
+  if(running)return;MODE=m;pf=false;adding=false;crosshair(false);
+  $("tabT").classList.toggle("on",m==="trv");$("tabP").classList.toggle("on",m==="pf");
+  document.querySelectorAll("[data-m]").forEach(e=>e.hidden=e.dataset.m!==m);
+  [rover,trail].forEach(l=>l&&map.removeLayer(l));rover=trail=null;if(hov){map.removeLayer(hov);hov=null}
+  if(m==="pf"){if(line){map.removeLayer(line);line=null}pfg.addTo(map);$("dock").hidden=true;
+    say("Path finder. Press the button, then click two points on the map, or two beacons, to compare the fastest, balanced and safest routes.");
+    if(pfSel){bars=pfR;DK=pfSel;dock()}}
+  else{map.removeLayer(pfg);$("dock").hidden=true;update();if(route.length<2)say("Story traverse. Click beacons and add at least four sites to build your mission route.")}
+  grade(0);if(m==="trv"&&route.length>1)select(route[route.length-1],true);else select("jez",true);
+}
+$("tabT").onclick=()=>setMode("trv");$("tabP").onclick=()=>setMode("pf");
+setMode("trv");
+
+/* ---- Drifting dust ---- */
+(()=>{const c=$("dust"),x=c.getContext("2d");let w,h;const rs=()=>{w=c.width=innerWidth;h=c.height=innerHeight};rs();addEventListener("resize",rs);
+ const P=Array.from({length:90},()=>({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.8+.4,v:Math.random()*.5+.15,a:Math.random()*.35+.1}));
+ if(matchMedia("(prefers-reduced-motion:reduce)").matches)return;
+ (function f(){x.clearRect(0,0,w,h);P.forEach(p=>{p.x+=p.v*1.6;p.y+=p.v*.25;if(p.x>w)p.x=-5;if(p.y>h)p.y=0;x.fillStyle=`rgba(255,200,150,${p.a})`;x.beginPath();x.arc(p.x,p.y,p.r,0,7);x.fill()});requestAnimationFrame(f)})()})();
+</script>
+</body>
+</html>
